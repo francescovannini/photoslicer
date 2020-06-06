@@ -17,9 +17,14 @@ class Parameter:
 
 class PixtractorParams:
     def __init__(self):
-        self.bw_thresh = Parameter(150, 0, 255, 5, "B/W Threshold")
-        self.bbox_min_size_prop = Parameter(3, 0, 100, 1, "Detectable min surface (% total)")
-        self.bbox_fill_thresh = Parameter(70, 0, 100, 1, "Bounding box % fill-up threshold")
+
+        self.bw_method = Parameter(0, 0, 2, 1, "BW Thresh Method (0=Simple, 1=Gauss, 2=Outso)")
+        self.bw_thresh = Parameter(180, 0, 255, 5, "BW Simple Thresh Min Value")
+        self.bw_gauss = Parameter(50, 0, 1000, 10, "BW Gauss block size")
+        self.bbox_min_size_prop = Parameter(1, 0, 100, .1, "Detectable min surface (% total)")
+        self.bbox_fill_thresh = Parameter(50, 0, 100, 1, "Bounding fill ratio threshold")
+        self.dilate_kernel = Parameter(10, 0, 500, 1, "Dilate matrix size (0=disabled)")
+        self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
 
 class Pixtractor:
@@ -39,10 +44,33 @@ class Pixtractor:
         self.image = cv2.imread(image_path)
         self.image_gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
-    def get_bbxs(self, draw_contours=False):
+    def get_bbxs(self):
 
-        ret, thresh = cv2.threshold(self.image_gray, self.params.bw_thresh.value, 255, cv2.THRESH_BINARY)
-        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        filter_out = self.image_gray
+
+        # Binary filter
+        if self.params.bw_method.value == 0:
+            ret, filter_out = cv2.threshold(self.image_gray, self.params.bw_thresh.value, 255, cv2.THRESH_BINARY)
+
+        if self.params.bw_method.value == 1:
+            if self.params.bw_gauss.value % 2 == 0:
+                block = self.params.bw_gauss.value + 1
+            else:
+                block = self.params.bw_gauss.value
+            filter_out = cv2.adaptiveThreshold(self.image_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
+                                               block, 2)
+
+        if self.params.bw_method.value == 2:
+            ret, filter_out = cv2.threshold(self.image_gray, self.params.bw_thresh.value, 255,
+                                            cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Erosion
+        if self.params.dilate_kernel.value > 0:
+            kernel = np.ones((self.params.dilate_kernel.value, self.params.dilate_kernel.value), np.uint8)
+            filter_out = cv2.dilate(filter_out, kernel)
+
+        # Find contours
+        contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if hierarchy is not None:
             hierarchy = hierarchy[0]
@@ -50,11 +78,6 @@ class Pixtractor:
         h, w, channels = self.image.shape
         img_area = h * w
         min_area = self.params.bbox_min_size_prop.value / 100 * img_area
-
-        if draw_contours:
-            preview = self.image.copy()
-        else:
-            preview = None
 
         bboxes = []
         for n, contour in enumerate(contours):
@@ -80,7 +103,7 @@ class Pixtractor:
             if fill_ratio > self.params.bbox_fill_thresh.value:
                 bboxes.append(bounding_box)
 
-        if preview is not None:
-            return bboxes, cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+        if self.params.preview_filter_output.value > 0:
+            return bboxes, cv2.cvtColor(filter_out, cv2.COLOR_BGR2RGB)
         else:
             return bboxes, cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)

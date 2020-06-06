@@ -107,7 +107,7 @@ class MainWindow:
             return
 
         self.button_update["state"] = "disabled"
-        bbxs, image = self.pixtractor.get_bbxs(draw_contours=True)
+        bbxs, image = self.pixtractor.get_bbxs()
         self.slicing_canvas.set_view(Image.fromarray(image), bbxs)
         self.button_update["state"] = "normal"
 

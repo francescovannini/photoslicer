@@ -46,6 +46,7 @@ class SlicingCanvas(Canvas):
 
         self.delete("corner")
         self.delete("bbox")
+        self.delete("label")
 
         b = 0
         for box in self.bbxs:
@@ -138,16 +139,29 @@ class SlicingCanvas(Canvas):
 
     def __redraw_bbox(self, b):
         # Redraw bbox
+
+        midx = 0
+        midy = 0
         bbox = []
         for i in range(4):
             t = self.find_withtag("crn_" + str(b) + "x" + str(i))
             coords = self.coords(t)
             bbox.append(coords[0] + 1)
             bbox.append(coords[1] + 1)
+            midx += (coords[0] + 1)
+            midy += (coords[1] + 1)
+
+        midx /= 4
+        midy /= 4
 
         bbx_tag = "bbx_" + str(b)
         self.delete(bbx_tag)
         self.create_polygon(bbox, outline="lightgreen", fill="", width=2, tags=("bbox", bbx_tag))
+
+        lbl_tag = "lbl_" + str(b)
+        self.delete(lbl_tag)
+        self.create_text([midx, midy], fill="lightgreen", text=str(b), font=('Arial', 30), tags=("label", lbl_tag))
+
         self.tag_raise("corner")
 
     def update_view(self, x=0, y=0):
