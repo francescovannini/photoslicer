@@ -4,105 +4,176 @@ from PIL import Image, ImageTk
 
 class SlicingCanvas(Canvas):
     def __init__(self, parent, **kwargs):
-        Canvas.__init__(self, parent, **kwargs)
+        Canvas.__init__(self, parent, **kwargs, borderwidth=0, highlightthickness=0, bg="black")
         self.zoom = 1.0
-        self.delta = 1.3
-        self.image_container = None
         self.image = None
         self.imagetk = None
-        self.width = 0
-        self.height = 0
+        self.picture_frame = None
+        self.bbxs = None
+        self.cross = [-1, -1, 8, -1, 8, 1, -8, 1, -8, -1, -1, -1, -1, -8, 1, -8, 1, 8, -1, 8]
+        self.origin = [0, 0]
+        self._on_bbox_updated = None
 
         # Events
         self.bind('<Configure>', self.update_view)
-        self.bind('<ButtonPress-1>', self.drag_from)
-        self.bind('<B1-Motion>', self.drag_to)
+        self.bind('<ButtonPress-1>', self.view_drag_start)
+        self.bind('<ButtonRelease-1>', self.view_drag_stop)
+        self.bind('<B1-Motion>', self.view_drag)
         self.bind('<MouseWheel>', self.mouse_wheel)
         self.bind('<Button-5>', self.mouse_wheel)
         self.bind('<Button-4>', self.mouse_wheel)
 
-    def drag_from(self, event):
-        self.scan_mark(event.x, event.y)
+        self.tag_bind("corner", "<ButtonPress-3>", self.corner_drag_start)
+        self.tag_bind("corner", "<B3-Motion>", self.corner_drag)
+        self.tag_bind("corner", "<ButtonRelease-3>", self.corner_drag_stop)
 
-    def drag_to(self, event):
+        self.corner_dragging_buffer = {"x": 0, "y": 0, "item": None}
+        self.view_dragging_buffer = {"x": 0, "y": 0}
+
+    def set_on_bbox_updated(self, fn):
+        self._on_bbox_updated = fn
+
+    def set_view(self, image, bbxs=None):
+        if self.image is None or self.image.width != image.width or self.image.height != image.height:
+            self.xview_moveto(0)
+            self.yview_moveto(0)
+            self.zoom = 1.0
+            self.delete("frame")
+            self.picture_frame = self.create_rectangle(0, 0, image.width, image.height, outline="", tags=("frame",))
+
+        self.image = image
+        self.bbxs = bbxs
+
+        self.delete("corner")
+        self.delete("bbox")
+
+        b = 0
+        for box in self.bbxs:
+            i = 0
+            for corner in box:
+                tag = "crn_" + str(b) + "x" + str(i)
+                cx = corner[0]
+                cy = corner[1]
+                poly = self.create_polygon(self.cross, outline="blue", activeoutline="red",
+                                           fill="gray", stipple='@transp.xbm', width=3,
+                                           tags=("corner", tag))
+                self.move(poly, cx, cy)
+                self.scale(poly, 0, 0, self.zoom, self.zoom)
+                i += 1
+            self.__redraw_bbox(b)
+            b += 1
+
+        self.update_view()
+        if self._on_bbox_updated is not None:
+            self._on_bbox_updated(self.bbxs)
+
+    def view_drag_start(self, event):
+        self.scan_mark(event.x, event.y)
+        self.view_dragging_buffer["x"] = event.x
+        self.view_dragging_buffer["y"] = event.y
+
+    def view_drag(self, event):
         self.scan_dragto(event.x, event.y, gain=1)
         self.update_view()  # redraw the image
+
+    def view_drag_stop(self, event):
+        self.scan_dragto(event.x, event.y, gain=1)
+        self.origin[0] += event.x - self.view_dragging_buffer["x"]
+        self.origin[1] += event.y - self.view_dragging_buffer["y"]
 
     def mouse_wheel(self, event):
         x = self.canvasx(event.x)
         y = self.canvasy(event.y)
 
-        bbox = self.bbox(self.image_container)  # get image area
-        if bbox[0] < x < bbox[2] and bbox[1] < y < bbox[3]:
-            pass  # Ok! Inside the image
-        else:
-            return  # zoom only inside image area
-
-        scale = 1.0
-
-        # Respond to Linux (event.num) or Windows (event.delta) wheel event
-        if event.num == 5 or event.delta == -120:  # scroll down
-            i = min(self.width, self.height)
-            if int(i * self.zoom) < 300:
-                return  # image is less than 30 pixels
-            self.zoom /= self.delta
-            scale /= self.delta
-
-        if event.num == 4 or event.delta == 120:  # scroll up
-            i = min(self.winfo_width(), self.winfo_height())
-            if i < self.zoom:
-                return  # 1 pixel is bigger than the visible area
-            self.zoom *= self.delta
-            scale *= self.delta
-
-        self.scale('all', x, y, scale, scale)  # rescale all canvas objects
-        self.update_view()
-
-    def set_image(self, image):
-        self.image = image
-        self.width, self.height = self.image.size
-
-        # Put image into container rectangle and use it to set proper coordinates to the image
-        self.image_container = self.create_rectangle(0, 0, self.width, self.height, width=0)
-        self.update_view()
-
-    def update_view(self, event=None):
-
-        if self.image_container is None:
+        # Zoom only when pointer over image
+        bbox = self.bbox(self.picture_frame)
+        if not (bbox[0] < x < bbox[2] and bbox[1] < y < bbox[3]):
             return
 
-        bbox1 = self.bbox(self.image_container)  # get image area
+        scale = 1.00000000
+        delta = 1.10000000
 
-        # Remove 1 pixel shift at the sides of the bbox1
-        bbox1 = (bbox1[0] + 1, bbox1[1] + 1, bbox1[2] - 1, bbox1[3] - 1)
-        bbox2 = (self.canvasx(0),  # get visible area of the canvas
-                 self.canvasy(0),
-                 self.canvasx(self.winfo_width()),
-                 self.canvasy(self.winfo_height()))
+        # Respond to Linux (event.num) or Windows (event.delta) wheel event
+        if event.num == 5 or event.delta == -120:
+            if self.zoom < 0.01:
+                return
 
-        bbox = [min(bbox1[0], bbox2[0]), min(bbox1[1], bbox2[1]),  # get scroll region box
-                max(bbox1[2], bbox2[2]), max(bbox1[3], bbox2[3])]
+            self.zoom /= delta
+            scale /= delta
 
-        if bbox[0] == bbox2[0] and bbox[2] == bbox2[2]:  # whole image in the visible area
-            bbox[0] = bbox1[0]
-            bbox[2] = bbox1[2]
+        if event.num == 4 or event.delta == 120:  # scroll up
+            if self.zoom > 20:
+                return
+            self.zoom *= delta
+            scale *= delta
 
-        if bbox[1] == bbox2[1] and bbox[3] == bbox2[3]:  # whole image in the visible area
-            bbox[1] = bbox1[1]
-            bbox[3] = bbox1[3]
+        self.scale('all', 0, 0, scale, scale)
+        self.update_view(x, y)
 
-        self.configure(scrollregion=bbox)  # set scroll region
-        x1 = max(bbox2[0] - bbox1[0], 0)  # get coordinates (x1,y1,x2,y2) of the image tile
-        y1 = max(bbox2[1] - bbox1[1], 0)
-        x2 = min(bbox2[2], bbox1[2]) - bbox1[0]
-        y2 = min(bbox2[3], bbox1[3]) - bbox1[1]
+    def corner_drag_start(self, event):
+        self.corner_dragging_buffer["item"] = self.find_withtag("current")[0]
+        self.corner_dragging_buffer["x"] = event.x
+        self.corner_dragging_buffer["y"] = event.y
 
-        if int(x2 - x1) > 0 and int(y2 - y1) > 0:  # show image if it in the visible area
-            x = min(int(x2 / self.zoom), self.width)  # sometimes it is larger on 1 pixel...
-            y = min(int(y2 / self.zoom), self.height)  # ...and sometimes not
-            image = self.image.crop((int(x1 / self.zoom), int(y1 / self.zoom), x, y))
-            imagetk = ImageTk.PhotoImage(image.resize((int(x2 - x1), int(y2 - y1))))
-            imageid = self.create_image(max(bbox2[0], bbox1[0]), max(bbox2[1], bbox1[1]),
-                                        anchor='nw', image=imagetk)
-            self.lower(imageid)  # set image into background
-            self.imagetk = imagetk  # keep an extra reference to prevent garbage-collection
+    def corner_drag(self, event):
+        delta_x = event.x - self.corner_dragging_buffer["x"]
+        delta_y = event.y - self.corner_dragging_buffer["y"]
+        self.move(self.corner_dragging_buffer["item"], delta_x, delta_y)
+        self.corner_dragging_buffer["x"] = event.x
+        self.corner_dragging_buffer["y"] = event.y
+
+    def corner_drag_stop(self, event):
+        tag = next(filter(lambda x: x.startswith('crn_'), self.gettags(self.corner_dragging_buffer["item"])))
+        bc = tag.split("_")[1].split("x")
+        b = int(bc[0])
+        c = int(bc[1])
+
+        # Update bbox coords
+        self.bbxs[b][c][0] = (self.coords(self.corner_dragging_buffer["item"])[0] + 1) / self.zoom
+        self.bbxs[b][c][1] = (self.coords(self.corner_dragging_buffer["item"])[1] + 1) / self.zoom
+        self.__redraw_bbox(b)
+
+        if self._on_bbox_updated is not None:
+            self._on_bbox_updated(self.bbxs)
+
+    def __redraw_bbox(self, b):
+        # Redraw bbox
+        bbox = []
+        for i in range(4):
+            t = self.find_withtag("crn_" + str(b) + "x" + str(i))
+            coords = self.coords(t)
+            bbox.append(coords[0] + 1)
+            bbox.append(coords[1] + 1)
+
+        bbx_tag = "bbx_" + str(b)
+        self.delete(bbx_tag)
+        self.create_polygon(bbox, outline="lightgreen", fill="", width=2, tags=("bbox", bbx_tag))
+        self.tag_raise("corner")
+
+    def update_view(self, x=0, y=0):
+        if self.image is None:
+            return
+
+        pic_bbx = self.bbox(self.picture_frame)
+        pic_bbx = (pic_bbx[0] + 1, pic_bbx[1] + 1, pic_bbx[2] - 1, pic_bbx[3] - 1)
+        canvas_bbx = (self.canvasx(0),
+                      self.canvasy(0),
+                      self.canvasx(self.winfo_width()),
+                      self.canvasy(self.winfo_height()))
+
+        x1 = max(canvas_bbx[0] - pic_bbx[0], 0)
+        y1 = max(canvas_bbx[1] - pic_bbx[1], 0)
+        x2 = min(canvas_bbx[2], pic_bbx[2]) - pic_bbx[0]
+        y2 = min(canvas_bbx[3], pic_bbx[3]) - pic_bbx[1]
+
+        if int(x2 - x1) <= 0 or int(y2 - y1) <= 0:
+            return
+
+        x = min(int(x2 / self.zoom), self.image.width)
+        y = min(int(y2 / self.zoom), self.image.height)
+
+        image = self.image.crop((int(x1 / self.zoom), int(y1 / self.zoom), x, y))
+        self.imagetk = ImageTk.PhotoImage(image.resize((int(x2 - x1), int(y2 - y1))))
+        imageid = self.create_image(max(canvas_bbx[0], pic_bbx[0]), max(canvas_bbx[1], pic_bbx[1]),
+                                    anchor='nw', image=self.imagetk)
+        self.lower(imageid)

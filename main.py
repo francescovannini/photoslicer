@@ -9,6 +9,13 @@ from slicingcanvas import *
 
 class MainWindow:
 
+    def __update_bbox_list(self, bboxes):
+        self.bbox_list.delete(0, END)
+        c = 0
+        for i in bboxes:
+            self.bbox_list.insert(END, str(c))
+            c +=1
+
     def __init__(self, initial_image_path=None):
 
         # Vars
@@ -47,7 +54,7 @@ class MainWindow:
         self.root.config(menu=menu)
 
         # Left side control panel
-        self.frame_controls = Frame(self.root, borderwidth=1)
+        self.frame_controls = Frame(self.root, borderwidth=5)
         self.frame_controls.grid(row=0, column=0, sticky="nsw")
 
         # Generate controls from parameters
@@ -60,20 +67,35 @@ class MainWindow:
             p.control = Spinbox(self.frame_controls, from_=p.min, to=p.max, increment=p.step,
                                 textvariable=DoubleVar(value=p.value), command=p.update)
 
-            p.control.grid(row=row, column=0, sticky="w")
+            p.control.grid(row=row, column=0, sticky="we")
             row += 1
-
-        self.pixtractor = Pixtractor(params)
-        if initial_image_path is not None:
-            self.pixtractor.load_image(initial_image_path)
 
         self.button_update = Button(self.frame_controls, text="Update", command=self.update_preview)
         self.button_update.grid(row=row, column=0, sticky="we")
 
+        row += 1
+        Separator(self.frame_controls, orient=HORIZONTAL).grid(row=row, column=0, sticky="we")
+
+        # Bbox List
+        row += 1
+        self.frame_list = Frame(self.frame_controls, borderwidth=0)
+        self.frame_list.grid(row=row, column=0, sticky="nwes")
+        self.frame_list.columnconfigure(0, weight=1)
+        scrollbar = Scrollbar(self.frame_list, orient=VERTICAL)
+        scrollbar.grid(row=0, column=1, sticky="nsew")
+        self.bbox_list = Listbox(self.frame_list, yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.bbox_list.yview)
+        self.bbox_list.grid(row=0, column=0, sticky="nswe")
+
         # Slicing canvas
-        self.slicing_canvas = SlicingCanvas(self.root, highlightthickness=0)
+        self.slicing_canvas = SlicingCanvas(self.root)
         self.slicing_canvas.grid(row=0, column=1, sticky='nswe')
         self.slicing_canvas.update()
+        self.slicing_canvas.set_on_bbox_updated(self.__update_bbox_list)
+
+        self.pixtractor = Pixtractor(params)
+        if initial_image_path is not None:
+            self.pixtractor.load_image(initial_image_path)
 
         if self.pixtractor.image_loaded():
             self.update_preview()
@@ -86,7 +108,7 @@ class MainWindow:
 
         self.button_update["state"] = "disabled"
         bbxs, image = self.pixtractor.get_bbxs(draw_contours=True)
-        self.slicing_canvas.set_image(Image.fromarray(image))
+        self.slicing_canvas.set_view(Image.fromarray(image), bbxs)
         self.button_update["state"] = "normal"
 
     def not_implemented(self):
@@ -103,4 +125,4 @@ class MainWindow:
             self.pixtractor.load_image(selection)
 
 
-app = MainWindow("img/scan_1537783784.png")
+app = MainWindow("img/scan_1537784960.png")

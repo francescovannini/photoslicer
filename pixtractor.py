@@ -17,9 +17,9 @@ class Parameter:
 
 class PixtractorParams:
     def __init__(self):
-        self.bw_thresh = Parameter(200, 0, 255, 10, "B/W Thresh")
-        self.bbox_min_size_prop = Parameter(5, 0, 100, 1, "Detectable min surface (% total)")
-        self.bbox_fill_thresh = Parameter(75, 0, 100, 1, "Boundind box % fill-up threshold")
+        self.bw_thresh = Parameter(150, 0, 255, 5, "B/W Threshold")
+        self.bbox_min_size_prop = Parameter(3, 0, 100, 1, "Detectable min surface (% total)")
+        self.bbox_fill_thresh = Parameter(70, 0, 100, 1, "Bounding box % fill-up threshold")
 
 
 class Pixtractor:
@@ -78,11 +78,7 @@ class Pixtractor:
             fill_ratio = (bbox_area - (bbox_area - shape_area)) / bbox_area * 100
 
             if fill_ratio > self.params.bbox_fill_thresh.value:
-                # Draw contour and bbox
-                if preview is not None:
-                    cv2.polylines(preview, [contour], True, (255, 0, 0))
-                    cv2.polylines(preview, [bounding_box], True, (0, 0, 255), 2)
-                print(f'Contour {n}: parent: {parent} fill_ratio: {fill_ratio} bbox_area: {bbox_area}')
+                bboxes.append(bounding_box)
 
         if preview is not None:
             return bboxes, cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
