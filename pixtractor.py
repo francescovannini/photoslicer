@@ -1,3 +1,5 @@
+from time import sleep
+
 import cv2
 import numpy as np
 
@@ -17,12 +19,12 @@ class Parameter:
 
 class PixtractorParams:
     def __init__(self):
-
+        self.gaussian = Parameter(10, 0, 100, 1, "Gaussian blur (0=disabled)")
         self.bw_method = Parameter(0, 0, 2, 1, "BW Thresh Method (0=Simple, 1=Gauss, 2=Outso)")
         self.bw_thresh = Parameter(180, 0, 255, 5, "BW Simple Thresh Min Value")
-        self.bw_gauss = Parameter(50, 0, 1000, 10, "BW Gauss block size")
+        self.bw_gauss = Parameter(51, 0, 1000, 2, "BW Gauss block size")
         self.bbox_min_size_prop = Parameter(1, 0, 100, .1, "Detectable min surface (% total)")
-        self.bbox_fill_thresh = Parameter(50, 0, 100, 1, "Bounding fill ratio threshold")
+        self.bbox_fill_thresh = Parameter(50, 0, 100, 1, "Bounding box fill ratio threshold")
         self.dilate_kernel = Parameter(10, 0, 500, 1, "Dilate matrix size (0=disabled)")
         self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
@@ -44,32 +46,46 @@ class Pixtractor:
         self.image = cv2.imread(image_path)
         self.image_gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
-    def get_bbxs(self):
-
+    def process_image(self, update_status_callback=None):
         filter_out = self.image_gray
+
+        # Gaussian blur
+        if self.params.gaussian.value > 0:
+            update_status_callback("Gaussian blur...")
+
+            if self.params.gaussian.value % 2 == 0:
+                block = self.params.gaussian.value + 1
+            else:
+                block = self.params.gaussian.value
+            filter_out = cv2.GaussianBlur(filter_out, (block, block), 0)
 
         # Binary filter
         if self.params.bw_method.value == 0:
-            ret, filter_out = cv2.threshold(self.image_gray, self.params.bw_thresh.value, 255, cv2.THRESH_BINARY)
+            update_status_callback("Simple binary thresholding...")
+            ret, filter_out = cv2.threshold(filter_out, self.params.bw_thresh.value, 255, cv2.THRESH_BINARY)
 
         if self.params.bw_method.value == 1:
+            update_status_callback("Adaptive Gaussian thresholding...")
             if self.params.bw_gauss.value % 2 == 0:
                 block = self.params.bw_gauss.value + 1
             else:
                 block = self.params.bw_gauss.value
-            filter_out = cv2.adaptiveThreshold(self.image_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
+            filter_out = cv2.adaptiveThreshold(filter_out, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
                                                block, 2)
 
         if self.params.bw_method.value == 2:
-            ret, filter_out = cv2.threshold(self.image_gray, self.params.bw_thresh.value, 255,
+            update_status_callback("Otsu thresholding...")
+            ret, filter_out = cv2.threshold(filter_out, self.params.bw_thresh.value, 255,
                                             cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         # Erosion
         if self.params.dilate_kernel.value > 0:
+            update_status_callback("Erode...")
             kernel = np.ones((self.params.dilate_kernel.value, self.params.dilate_kernel.value), np.uint8)
             filter_out = cv2.dilate(filter_out, kernel)
 
         # Find contours
+        update_status_callback("Finding contours...")
         contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if hierarchy is not None:
@@ -81,6 +97,8 @@ class Pixtractor:
 
         bboxes = []
         for n, contour in enumerate(contours):
+            update_status_callback("Contour " + str(n) + "/" + str(len(contours)) + " - Valid:" + str(len(bboxes)))
+
             parent = hierarchy[n][3]
 
             if len(contour) < 4:
