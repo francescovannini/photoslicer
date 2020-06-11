@@ -34,16 +34,9 @@ class PhotoSlicer(Frame):
         menu.add_cascade(label="File", menu=menu_file)
 
         # Edit menu
-        menu_edit = Menu(menu, tearoff=0)
-        menu_edit.add_command(label="Cut", command=self.not_implemented)
-        menu_edit.add_command(label="Copy", command=self.not_implemented)
-        menu_edit.add_command(label="Paste", command=self.not_implemented)
-        menu.add_cascade(label="Edit", menu=menu_edit)
-
-        # Help menu
-        menu_help = Menu(menu, tearoff=0)
-        menu_help.add_command(label="About", command=self.not_implemented)
-        menu.add_cascade(label="Help", menu=menu_help)
+        menu_operation = Menu(menu, tearoff=0)
+        menu_operation.add_command(label="Abort", command=self.abort_processing)
+        menu.add_cascade(label="Oper", menu=menu_operation)
 
         self.parent.config(menu=menu)
 
@@ -108,12 +101,17 @@ class PhotoSlicer(Frame):
 
         self.button_update["state"] = "disabled"
         bbxs, image = self.pixtractor.process_image(self.update_statusbar)
-        self.slicing_canvas.set_view(Image.fromarray(image), bbxs)
+        self.slicing_canvas.set_image(Image.fromarray(image))
+        self.slicing_canvas.set_bboxes(bbxs)
+        self.slicing_canvas.update_view()
         self.button_update["state"] = "normal"
         self.statuslabel_stringvar.set("Ready.")
 
     def not_implemented(self):
         return
+
+    def abort_processing(self):
+        self.pixtractor.abort_operation()
 
     def open_file(self):
         selection = filedialog.askopenfilename(initialdir="~", title="Select file",

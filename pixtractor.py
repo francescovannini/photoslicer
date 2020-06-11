@@ -33,6 +33,7 @@ class Pixtractor:
     def __init__(self, params=None):
         self.image = None
         self.image_gray = None
+        self.abort_flag = False
 
         if params is not None:
             self.params = params
@@ -46,8 +47,12 @@ class Pixtractor:
         self.image = cv2.imread(image_path)
         self.image_gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
+    def abort_operation(self):
+        self.abort_flag = True
+
     def process_image(self, update_status_callback=None):
         filter_out = self.image_gray
+        self.abort_flag = False
 
         # Gaussian blur
         if self.params.gaussian.value > 0:
@@ -97,6 +102,11 @@ class Pixtractor:
 
         bboxes = []
         for n, contour in enumerate(contours):
+
+            if self.abort_flag:
+                bboxes = []
+                break
+
             update_status_callback("Contour " + str(n) + "/" + str(len(contours)) + " - Valid:" + str(len(bboxes)))
 
             parent = hierarchy[n][3]
