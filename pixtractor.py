@@ -69,6 +69,7 @@ class Pixtractor:
             update_status_callback("Simple binary thresholding...")
             ret, filter_out = cv2.threshold(filter_out, self.params.bw_thresh.value, 255, cv2.THRESH_BINARY)
 
+        # Adaptive thresh
         if self.params.bw_method.value == 1:
             update_status_callback("Adaptive Gaussian thresholding...")
             if self.params.bw_gauss.value % 2 == 0:
@@ -78,6 +79,7 @@ class Pixtractor:
             filter_out = cv2.adaptiveThreshold(filter_out, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
                                                block, 2)
 
+        # Otsu thresh
         if self.params.bw_method.value == 2:
             update_status_callback("Otsu thresholding...")
             ret, filter_out = cv2.threshold(filter_out, self.params.bw_thresh.value, 255,

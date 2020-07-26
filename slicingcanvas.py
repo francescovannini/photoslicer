@@ -119,10 +119,10 @@ class SlicingCanvas(Canvas):
             for box in bbxs:
                 # Check if bbox is the same as one of our slices
                 overlaps_locked = False
-                for sl in merged_slices:
-                    if polys_iou(box, sl.bbox) > 0.8:
-                        overlaps_locked = True
-                        break
+                # for sl in merged_slices:
+                #     if polys_iou(box, sl.bbox) > 0.8:
+                #         overlaps_locked = True
+                #         break
                 if not overlaps_locked:
                     s = PhotoSlice(box)
                     merged_slices.append(s)

@@ -1,8 +1,10 @@
 from tkinter import *
 from tkinter import filedialog
+from tkinter import messagebox
 from tkinter.ttk import *
 from pixtractor import *
 from slicingcanvas import *
+import os
 
 
 class PhotoSlicer(Frame):
@@ -18,6 +20,8 @@ class PhotoSlicer(Frame):
         Frame.__init__(self, parent)
         self.parent = parent
         self.winfo_toplevel().title("PhotoSlicer")
+        self.source_images = []
+        self.source_index = None
 
         # Grid layout
         Grid.rowconfigure(self.parent, 0, weight=1)
@@ -27,7 +31,10 @@ class PhotoSlicer(Frame):
 
         # File menu
         menu_file = Menu(menu, tearoff=0)
-        menu_file.add_command(label="Open", command=self.open_file)
+        menu_file.add_command(label="Open directory", command=self.open_directory)
+        menu_file.add_separator()
+        menu_file.add_command(label="Next image", command=self.next_image)
+        menu_file.add_command(label="Previous image", command=self.prev_image)
         menu_file.add_command(label="Save", command=self.not_implemented)
         menu_file.add_separator()
         menu_file.add_command(label="Exit", command=self.parent.quit)
@@ -88,10 +95,30 @@ class PhotoSlicer(Frame):
 
     def update_statusbar(self, text):
         self.statuslabel_stringvar.set(text)
+        print(text)
         self.parent.update()
 
-    def load_image(self, image_path):
-        self.pixtractor.load_image(image_path)
+    def load_image(self, move_index=0):
+
+        if len(self.source_images) == 0:
+            self.open_directory()
+
+        if self.source_index is None:
+            self.source_index = 0
+        else:
+            self.source_index += move_index
+
+            if self.source_index < 0:
+                self.source_index = 0
+                messagebox.showwarning(title="No previous", message="This is the first image")
+                return
+
+            if self.source_index >= len(self.source_images):
+                self.source_index = len(self.source_images) - 1
+                messagebox.showwarning(title="No next", message="This is the last image")
+                return
+
+        self.pixtractor.load_image(self.source_images[self.source_index])
         if self.pixtractor.image_loaded():
             self.update_preview()
 
@@ -113,11 +140,22 @@ class PhotoSlicer(Frame):
     def abort_processing(self):
         self.pixtractor.abort_operation()
 
-    def open_file(self):
-        selection = filedialog.askopenfilename(initialdir="~", title="Select file",
-                                               filetypes=(("JPG", "*.jpg"),
-                                                          ("PNG", "*.png"),
-                                                          ("All files", "*.*")))
+    def open_directory(self, basedir=None):
+        if basedir is None:
+            basedir = filedialog.askdirectory()
 
-        if selection is not None and selection != "":
-            self.load_image(selection)
+        if basedir is not None:
+            for file in os.listdir(basedir):
+                if file.endswith(".png"):
+                    self.source_images.append(os.path.join(basedir, file))
+
+        if len(self.source_images) == 0:
+            messagebox.showwarning(title="No images", message="No images available")
+        else:
+            self.load_image(0)
+
+    def next_image(self):
+        self.load_image(1)
+
+    def prev_image(self):
+        self.load_image(-1)
