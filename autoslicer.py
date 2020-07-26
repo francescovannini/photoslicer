@@ -17,7 +17,7 @@ class Parameter:
         self.value = int(self.control.get())
 
 
-class PixtractorParams:
+class AutoslicerParams:
     def __init__(self):
         self.gaussian = Parameter(10, 0, 100, 1, "Gaussian blur (0=disabled)")
         self.bw_method = Parameter(0, 0, 2, 1, "BW Thresh Method (0=Simple, 1=Gauss, 2=Outso)")
@@ -29,7 +29,7 @@ class PixtractorParams:
         self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
 
-class Pixtractor:
+class Autoslicer:
     def __init__(self, params=None):
         self.image = None
         self.image_gray = None
@@ -38,7 +38,7 @@ class Pixtractor:
         if params is not None:
             self.params = params
         else:
-            self.params = PixtractorParams()
+            self.params = AutoslicerParams()
 
     def image_loaded(self):
         return self.image is not None
@@ -105,7 +105,7 @@ class Pixtractor:
 
         # Find contours
         update_status_callback("Finding contours...")
-        contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if hierarchy is not None:
             hierarchy = hierarchy[0]
