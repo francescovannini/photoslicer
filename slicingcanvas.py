@@ -157,8 +157,8 @@ class SlicingCanvas(Canvas):
         if not (bbox[0] < x < bbox[2] and bbox[1] < y < bbox[3]):
             return
 
-        scale = 1.00000000
-        delta = 1.10000000
+        scale = 1.00
+        delta = 1.05
 
         # Respond to Linux (event.num) or Windows (event.delta) wheel event
         if event.num == 5 or event.delta == -120:

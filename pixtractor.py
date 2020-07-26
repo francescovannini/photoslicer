@@ -50,6 +50,18 @@ class Pixtractor:
     def abort_operation(self):
         self.abort_flag = True
 
+    # Find all bbox related to n
+    def get_relatives(self, hierarchy, n):
+        relatives = []
+
+        while 1:
+            father = hierarchy[n][3]
+            if father >= 0:
+                relatives.append(father)
+                n = father
+            else:
+                return relatives
+
     def process_image(self, update_status_callback=None):
         filter_out = self.image_gray
         self.abort_flag = False
@@ -87,7 +99,7 @@ class Pixtractor:
 
         # Erosion
         if self.params.dilate_kernel.value > 0:
-            update_status_callback("Erode...")
+            update_status_callback("Dilate...")
             kernel = np.ones((self.params.dilate_kernel.value, self.params.dilate_kernel.value), np.uint8)
             filter_out = cv2.dilate(filter_out, kernel)
 
@@ -119,13 +131,14 @@ class Pixtractor:
 
             update_status_callback("Processing contour " + str(n) + "/" + str(len(contours)))
 
-            # If child of a selected bbox, then it's discarded (it's inside)
-            parent = hierarchy[n][3]
-            if parent in good_ids or parent in discarded_ids:
+            # No triangles
+            if len(contour) < 4:
                 discarded_ids.append(n)
                 continue
 
-            if len(contour) < 4:
+            # If child of a selected bbox, then it's discarded (it's inside)
+            relatives = self.get_relatives(hierarchy, n)
+            if set(relatives).intersection(good_ids):
                 discarded_ids.append(n)
                 continue
 
@@ -138,17 +151,18 @@ class Pixtractor:
 
             # Too small or too big
             if shape_area < 1 or bbox_area < min_area or bbox_area > img_area * 0.90:
-                if n > 0:  # the whole image could be detected as a big bounding box so it shouldn't be discarded
-                    discarded_ids.append(n)
+                discarded_ids.append(n)
                 continue
 
             # Fill ratio
             fill_ratio = (bbox_area - (bbox_area - shape_area)) / bbox_area * 100
-            if fill_ratio > self.params.bbox_fill_thresh.value:
-                good_ids.append(n)
-                boxes.append(bounding_box)
-            else:
+            if fill_ratio < self.params.bbox_fill_thresh.value:
                 discarded_ids.append(n)
+                continue
+
+            # It's good
+            good_ids.append(n)
+            boxes.append(bounding_box)
 
         if self.params.preview_filter_output.value > 0:
             return boxes, cv2.cvtColor(filter_out, cv2.COLOR_BGR2RGB)
