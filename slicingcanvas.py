@@ -85,19 +85,19 @@ class SlicingCanvas(Canvas):
 
         # Events
         self.bind('<Configure>', self.update_view)
-        self.bind('<ButtonPress-1>', self.view_drag_start)
-        self.bind('<ButtonRelease-1>', self.view_drag_stop)
-        self.bind('<B1-Motion>', self.view_drag)
+        self.bind('<ButtonPress-3>', self.view_drag_start)
+        self.bind('<B3-Motion>', self.view_drag)
+        self.bind('<ButtonRelease-3>', self.view_drag_stop)
         self.bind('<MouseWheel>', self.mouse_wheel)
         self.bind('<Button-5>', self.mouse_wheel)
         self.bind('<Button-4>', self.mouse_wheel)
 
-        self.tag_bind("corner", "<ButtonPress-3>", self.corner_drag_start)
-        self.tag_bind("corner", "<B3-Motion>", self.corner_drag)
-        self.tag_bind("corner", "<ButtonRelease-3>", self.corner_drag_stop)
+        self.tag_bind("corner", "<ButtonPress-1>", self.corner_drag_start)
+        self.tag_bind("corner", "<B1-Motion>", self.corner_drag)
+        self.tag_bind("corner", "<ButtonRelease-1>", self.corner_drag_stop)
 
-        self.tag_bind("edge", "<ButtonPress-3>", self.edge_select_top)
-        self.tag_bind("label", "<ButtonPress-3>", self.label_lock_slice)
+        self.tag_bind("edge", "<ButtonPress-1>", self.edge_select_top)
+        self.tag_bind("label", "<ButtonPress-1>", self.label_lock_slice)
 
         self.corner_dragging_buffer = {"x": 0, "y": 0, "item": None}
         self.view_dragging_buffer = {"x": 0, "y": 0}
@@ -222,6 +222,7 @@ class SlicingCanvas(Canvas):
         line = self.find_withtag("current")[0]
         si, e = get_slice_and_edge_from_tags(self.gettags(line))
         self.slices[si].set_top_left_from_edge_index(e)
+        self.slices[si].toggle_locked(True)
         self.__draw_slice(si)
 
     def label_lock_slice(self, event):

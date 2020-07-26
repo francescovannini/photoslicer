@@ -1,31 +1,37 @@
-import math
+import numpy as np
 
 
-def distance_to_line(x, y, ax, ay, bx, by):
-    x_diff = bx - ax
-    y_diff = by - ay
-    num = abs(y_diff * x - x_diff * y + bx * ay - by * ax)
-    den = math.sqrt(y_diff ** 2 + x_diff ** 2)
-    return num / den
+def distance_points(a, b):
+    return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def contour_box_avg_distance(contour, bounding_box):
-    avg = 0
-    for i, p in enumerate(contour):
-        p = p[0]
-        d = None
-        for c1 in range(4):
-            c2 = (c1 + 1) % 4
-            dx = distance_to_line(p[0], p[1],
-                                  bounding_box[c1][0], bounding_box[c1][1],
-                                  bounding_box[c2][0], bounding_box[c2][1])
+def crop_to_circle(img, center, radius):
+    x1 = center[0] - radius
+    y1 = center[1] - radius
+    x2 = center[0] + radius
+    y2 = center[1] + radius
 
-            if d is None or dx < d:
-                d = dx
+    if x1 < 0 or y1 < 0 or x2 > img.shape[1] or y2 > img.shape[0]:
+        img = np.pad(img, ((np.abs(np.minimum(0, y1)), np.maximum(y2 - img.shape[0], 0)),
+                           (np.abs(np.minimum(0, x1)), np.maximum(x2 - img.shape[1], 0)),
+                           (0, 0)),
+                     mode="constant")
 
-        if i == 0:
-            avg = d
-        else:
-            avg = (avg * (i - 1) + d) / i
+        y2 += np.abs(np.minimum(0, y1))
+        y1 += np.abs(np.minimum(0, y1))
+        x2 += np.abs(np.minimum(0, x1))
+        x1 += np.abs(np.minimum(0, x1))
 
-    return avg
+    return img[y1:y2, x1:x2, :]
+
+
+def shift_points_to_min_distance(bbox1, bbox2):
+    # TODO check input be quadrilateral
+    dists = np.array([0, 0, 0, 0])
+    for i, d in enumerate(dists):
+        shifted = np.roll(bbox1, i, axis=0)
+        for j, p in enumerate(bbox2):
+            dists[i] += distance_points(shifted[j], p)
+
+    best = np.where(dists == np.amin(dists))
+    return np.roll(bbox1, best[0], axis=0)
