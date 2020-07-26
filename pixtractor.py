@@ -24,8 +24,8 @@ class PixtractorParams:
         self.bw_thresh = Parameter(180, 0, 255, 5, "BW Simple Thresh Min Value")
         self.bw_gauss = Parameter(51, 0, 1000, 2, "BW Gauss block size")
         self.bbox_min_size_prop = Parameter(1, 0, 100, .1, "Detectable min surface (% total)")
-        self.bbox_fill_thresh = Parameter(50, 0, 100, 1, "Bounding box fill ratio threshold")
-        self.dilate_kernel = Parameter(10, 0, 500, 1, "Dilate matrix size (0=disabled)")
+        self.bbox_fill_thresh = Parameter(65, 0, 100, 1, "Bounding box fill ratio threshold")
+        self.dilate_kernel = Parameter(5, 0, 500, 1, "Dilate matrix size (0=disabled)")
         self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
 
@@ -97,43 +97,60 @@ class Pixtractor:
 
         if hierarchy is not None:
             hierarchy = hierarchy[0]
+        else:
+            if self.params.preview_filter_output.value > 0:
+                return [], cv2.cvtColor(filter_out, cv2.COLOR_BGR2RGB)
+            else:
+                return [], cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
 
+        # Calculate total image area and minimum box thresh
         h, w, channels = self.image.shape
         img_area = h * w
         min_area = self.params.bbox_min_size_prop.value / 100 * img_area
 
-        bboxes = []
+        boxes = []
+        good_ids = []
+        discarded_ids = []
         for n, contour in enumerate(contours):
 
             if self.abort_flag:
-                bboxes = []
+                boxes = []
                 break
 
-            update_status_callback("Contour " + str(n) + "/" + str(len(contours)) + " - Valid:" + str(len(bboxes)))
+            update_status_callback("Processing contour " + str(n) + "/" + str(len(contours)))
 
+            # If child of a selected bbox, then it's discarded (it's inside)
             parent = hierarchy[n][3]
+            if parent in good_ids or parent in discarded_ids:
+                discarded_ids.append(n)
+                continue
 
             if len(contour) < 4:
+                discarded_ids.append(n)
                 continue
 
             # Find bounding box
             bbox_rot_rect = cv2.minAreaRect(contour)
             bounding_box = cv2.boxPoints(bbox_rot_rect)
             bounding_box = np.int0(bounding_box)
-
             shape_area = cv2.contourArea(contour)
             bbox_area = cv2.contourArea(bounding_box)
 
             # Too small or too big
-            if shape_area < 1 or bbox_area < min_area or bbox_area > img_area * 0.80:
+            if shape_area < 1 or bbox_area < min_area or bbox_area > img_area * 0.90:
+                if n > 0:  # the whole image could be detected as a big bounding box so it shouldn't be discarded
+                    discarded_ids.append(n)
                 continue
 
+            # Fill ratio
             fill_ratio = (bbox_area - (bbox_area - shape_area)) / bbox_area * 100
-
             if fill_ratio > self.params.bbox_fill_thresh.value:
-                bboxes.append(bounding_box)
+                good_ids.append(n)
+                boxes.append(bounding_box)
+            else:
+                discarded_ids.append(n)
 
         if self.params.preview_filter_output.value > 0:
-            return bboxes, cv2.cvtColor(filter_out, cv2.COLOR_BGR2RGB)
+            return boxes, cv2.cvtColor(filter_out, cv2.COLOR_BGR2RGB)
         else:
-            return bboxes, cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            return boxes, cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
