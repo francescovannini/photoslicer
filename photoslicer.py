@@ -68,18 +68,22 @@ class PhotoSlicer(Frame):
         self.button_update.grid(row=row, column=0, sticky="we")
 
         row += 1
-        Separator(self.frame_controls, orient=HORIZONTAL).grid(row=row, column=0, sticky="we")
+        self.button_addbox = Button(self.frame_controls, text="Add Bbox", command=self.add_box)
+        self.button_addbox.grid(row=row, column=0, sticky="we")
+
+        # row += 1
+        # Separator(self.frame_controls, orient=HORIZONTAL).grid(row=row, column=0, sticky="we")
 
         # Bbox List
-        row += 1
-        self.frame_list = Frame(self.frame_controls, borderwidth=0)
-        self.frame_list.grid(row=row, column=0, sticky="nwes")
-        self.frame_list.columnconfigure(0, weight=1)
-        scrollbar = Scrollbar(self.frame_list, orient=VERTICAL)
-        scrollbar.grid(row=0, column=1, sticky="nsew")
-        self.bbox_list = Listbox(self.frame_list, yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.bbox_list.yview)
-        self.bbox_list.grid(row=0, column=0, sticky="nswe")
+        # row += 1
+        # self.frame_list = Frame(self.frame_controls, borderwidth=0)
+        # self.frame_list.grid(row=row, column=0, sticky="nwes")
+        # self.frame_list.columnconfigure(0, weight=1)
+        # scrollbar = Scrollbar(self.frame_list, orient=VERTICAL)
+        # scrollbar.grid(row=0, column=1, sticky="nsew")
+        # self.bbox_list = Listbox(self.frame_list, yscrollcommand=scrollbar.set)
+        # scrollbar.config(command=self.bbox_list.yview)
+        # self.bbox_list.grid(row=0, column=0, sticky="nswe")
 
         self.statuslabel_stringvar = StringVar(self.parent)
         self.statuslabel = Label(self.parent, textvariable=self.statuslabel_stringvar, anchor="w", relief=SUNKEN).grid(
@@ -139,6 +143,11 @@ class PhotoSlicer(Frame):
 
     def abort_processing(self):
         self.pixtractor.abort_operation()
+
+    def add_box(self):
+        new_slice = PhotoSlice([[10, 10], [100, 10], [100, 100], [10, 100]])
+        new_slice.toggle_locked()
+        self.slicing_canvas.add_bbox(new_slice)
 
     def open_directory(self, basedir=None):
         if basedir is None:

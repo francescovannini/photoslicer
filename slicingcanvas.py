@@ -115,6 +115,14 @@ class SlicingCanvas(Canvas):
             self.slices = []
         self.image = image
 
+    def add_bbox(self, bbx):
+        self.slices.append(bbx)
+        self.delete("slice")
+        for b in range(len(self.slices)):
+            self.__draw_slice(b)
+
+        self.update_view()
+
     def update_bboxes(self, bbxs=None):
         if bbxs is not None:
             merged_slices = []
@@ -140,8 +148,6 @@ class SlicingCanvas(Canvas):
             self.__draw_slice(b)
 
         self.update_view()
-        # if self._on_bbox_updated is not None:
-        #     self._on_bbox_updated(self.bbxs)
 
     def view_drag_start(self, event):
         self.scan_mark(event.x, event.y)
@@ -211,9 +217,6 @@ class SlicingCanvas(Canvas):
 
         self.slices[b].update_corner(c, x, y)
         self.__draw_slice(b)
-
-        # if self._on_bbox_updated is not None:
-        #     self._on_bbox_updated(self.bbxs)
 
     def edge_select_top(self, event):
         line = self.find_withtag("current")[0]
