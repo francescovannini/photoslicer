@@ -129,7 +129,7 @@ class PhotoSlicer(Frame):
         self.button_update["state"] = "disabled"
         bbxs, image = self.pixtractor.process_image(self.update_statusbar)
         self.slicing_canvas.set_image(Image.fromarray(image))
-        self.slicing_canvas.set_bboxes(bbxs)
+        self.slicing_canvas.update_bboxes(bbxs)
         self.slicing_canvas.update_view()
         self.button_update["state"] = "normal"
         self.statuslabel_stringvar.set("Ready.")

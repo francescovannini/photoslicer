@@ -35,6 +35,11 @@ def slice_label_tag(s):
     return "lbl_" + str(s)
 
 
+def get_slice_from_tags(tags):
+    tag = next(filter(lambda x: x.startswith('lbl_'), tags))
+    return tag.split("_")[1]
+
+
 def polys_iou(poly1, poly2):
     poly_1 = Polygon(poly1)
     poly_2 = Polygon(poly2)
@@ -47,8 +52,11 @@ class PhotoSlice:
         self.bbox = bbox
         self.locked = False
 
-    def set_locked(self, locked=True):
-        self.locked = locked
+    def toggle_locked(self, locked=None):
+        if locked is not None:
+            self.locked = locked
+        else:
+            self.locked = not self.locked
 
     def set_top_left_from_edge_index(self, i):
         bbox = []
@@ -89,6 +97,7 @@ class SlicingCanvas(Canvas):
         self.tag_bind("corner", "<ButtonRelease-3>", self.corner_drag_stop)
 
         self.tag_bind("edge", "<ButtonPress-3>", self.edge_select_top)
+        self.tag_bind("label", "<ButtonPress-3>", self.label_lock_slice)
 
         self.corner_dragging_buffer = {"x": 0, "y": 0, "item": None}
         self.view_dragging_buffer = {"x": 0, "y": 0}
@@ -106,7 +115,7 @@ class SlicingCanvas(Canvas):
             self.slices = []
         self.image = image
 
-    def set_bboxes(self, bbxs=None):
+    def update_bboxes(self, bbxs=None):
         if bbxs is not None:
             merged_slices = []
             for sl in self.slices:
@@ -114,12 +123,12 @@ class SlicingCanvas(Canvas):
                     merged_slices.append(sl)
 
             for box in bbxs:
-                # Check if bbox is the same as one of our slices
+                # Check if bbox is the same as one of the locked slices
                 overlaps_locked = False
-                # for sl in merged_slices:
-                #     if polys_iou(box, sl.bbox) > 0.8:
-                #         overlaps_locked = True
-                #         break
+                for sl in merged_slices:
+                    if polys_iou(box, sl.bbox) > 0.3:
+                        overlaps_locked = True
+                        break
                 if not overlaps_locked:
                     s = PhotoSlice(box)
                     merged_slices.append(s)
@@ -212,6 +221,12 @@ class SlicingCanvas(Canvas):
         self.slices[si].set_top_left_from_edge_index(e)
         self.__draw_slice(si)
 
+    def label_lock_slice(self, event):
+        label = self.find_withtag("current")[0]
+        s = get_slice_from_tags(self.gettags(label))
+        self.slices[int(s)].toggle_locked()
+        self.update_bboxes()
+
     def __draw_slice(self, si):
         s = self.slices[si]
         s_tag = slice_tag(si)
@@ -238,7 +253,10 @@ class SlicingCanvas(Canvas):
             if i == 0:
                 color = "red"
             else:
-                color = "lightgreen"
+                if s.locked:
+                    color = "blue"
+                else:
+                    color = "lightgreen"
 
             self.create_line(a[0] * self.zoom, a[1] * self.zoom, b[0] * self.zoom, b[1] * self.zoom,
                              fill=color, width=3, tags=(s_tag, slice_edge_tag(si, i), "edge", "slice"))
@@ -253,7 +271,12 @@ class SlicingCanvas(Canvas):
 
         # Draw label
         center = Polygon(s.bbox).centroid.coords[:]
-        label = self.create_text(center, fill="lightgreen", text=str(si), font=('Arial', 30),
+        if s.locked:
+            color = "blue"
+        else:
+            color = "lightgreen"
+
+        label = self.create_text(center, fill=color, text=str(si), font=('Arial', 20), activefill="red",
                                  tags=(s_tag, slice_label_tag(si), "label", "slice"))
         self.scale(label, 0, 0, self.zoom, self.zoom)
         self.tag_raise("corner")
