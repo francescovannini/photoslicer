@@ -3,8 +3,8 @@ from PIL import Image, ImageTk
 from shapely.geometry import Polygon
 
 
-def slice_corner_tag(s, i):
-    return "crn_" + str(s) + "x" + str(i)
+def slice_corner_tag(s, c):
+    return "crn_" + str(s) + "x" + str(c)
 
 
 def get_slice_and_corner_from_tags(tags):
@@ -15,8 +15,8 @@ def get_slice_and_corner_from_tags(tags):
     return s, c
 
 
-def slice_edge_tag(s, i):
-    return "edg_" + str(s) + "x" + str(i)
+def slice_edge_tag(s, e):
+    return "edg_" + str(s) + "x" + str(e)
 
 
 def get_slice_and_edge_from_tags(tags):
@@ -50,13 +50,10 @@ class PhotoSlice:
     def set_locked(self, locked=True):
         self.locked = locked
 
-    def set_upper_left_from_line_index(self, i):
-        j = i
+    def set_top_left_from_edge_index(self, i):
         bbox = []
-        for k in range(4):
-            j += k
-            if j > 3:
-                j = 0
+        for n in range(4):
+            j = (i + n) % 4
             bbox.append(self.bbox[j])
 
         self.bbox = bbox
@@ -91,7 +88,7 @@ class SlicingCanvas(Canvas):
         self.tag_bind("corner", "<B3-Motion>", self.corner_drag)
         self.tag_bind("corner", "<ButtonRelease-3>", self.corner_drag_stop)
 
-        # self.tag_bind("edge", "<ButtonPress-3>", self.edge_select_top)
+        self.tag_bind("edge", "<ButtonPress-3>", self.edge_select_top)
 
         self.corner_dragging_buffer = {"x": 0, "y": 0, "item": None}
         self.view_dragging_buffer = {"x": 0, "y": 0}
@@ -181,7 +178,7 @@ class SlicingCanvas(Canvas):
         self.update_view(x, y)
 
     def corner_drag_start(self, event):
-        self.corner_dragging_buffer["item"] = self.find_withtag("current")[0]
+        self.corner_dragging_buffer["item"] = self.find_withtag(CURRENT)
         self.corner_dragging_buffer["x"] = event.x
         self.corner_dragging_buffer["y"] = event.y
 
@@ -193,7 +190,8 @@ class SlicingCanvas(Canvas):
         self.corner_dragging_buffer["y"] = event.y
 
     def corner_drag_stop(self, event):
-        b, c = get_slice_and_corner_from_tags(self.gettags(self.corner_dragging_buffer["item"]))
+        tags = self.gettags(self.corner_dragging_buffer["item"])
+        b, c = get_slice_and_corner_from_tags(tags)
 
         # Update bbox coords
         x = self.coords(self.corner_dragging_buffer["item"])[0] + 1
@@ -203,9 +201,6 @@ class SlicingCanvas(Canvas):
         y /= self.zoom
 
         self.slices[b].update_corner(c, x, y)
-
-        print(b, c)
-
         self.__draw_slice(b)
 
         # if self._on_bbox_updated is not None:
@@ -214,46 +209,53 @@ class SlicingCanvas(Canvas):
     def edge_select_top(self, event):
         line = self.find_withtag("current")[0]
         si, e = get_slice_and_edge_from_tags(self.gettags(line))
-        self.slices[si].set_upper_left_from_line_index(e)
+        self.slices[si].set_top_left_from_edge_index(e)
         self.__draw_slice(si)
 
     def __draw_slice(self, si):
         s = self.slices[si]
-        s_tag = slice_tag(s)
+        s_tag = slice_tag(si)
         self.delete(s_tag)
 
-        o = None
-        q = None
-        i = 0
+        # Generates edge list
+        edges = []
+        prev = None
+        origin = None
         for p in s.bbox:
+            if prev is None:
+                prev = p
+                origin = p
+                continue
+            edge = (prev, p)
+            edges.append(edge)
+            prev = p
+        edge = (prev, origin)
+        edges.append(edge)
 
+        # Draw edges
+        for i, e in enumerate(edges):
+            (a, b) = e
+            if i == 0:
+                color = "red"
+            else:
+                color = "lightgreen"
+
+            self.create_line(a[0] * self.zoom, a[1] * self.zoom, b[0] * self.zoom, b[1] * self.zoom,
+                             fill=color, width=3, tags=(s_tag, slice_edge_tag(si, i), "edge", "slice"))
+
+        # Draw a "cross" at every corner of the bbox
+        for i, p in enumerate(s.bbox):
             poly = self.create_polygon(self.cross, outline="blue", activeoutline="red",
                                        fill="gray", stipple='@transp.xbm', width=3,
                                        tags=(s_tag, slice_corner_tag(si, i), "corner", "slice"))
             self.move(poly, p[0], p[1])
             self.scale(poly, 0, 0, self.zoom, self.zoom)
 
-            if o is None:
-                o = p
-                q = p
-                continue
-
-            if i == 0:
-                self.create_line(q[0] * self.zoom, q[1] * self.zoom, p[0] * self.zoom, p[1] * self.zoom,
-                                 fill="red", width=3, tags=(s_tag, slice_edge_tag(si, i), "edge", "slice"))
-            else:
-                self.create_line(q[0] * self.zoom, q[1] * self.zoom, p[0] * self.zoom, p[1] * self.zoom,
-                                 fill="lightgreen", width=2, tags=(s_tag, slice_edge_tag(si, i), "edge", "slice"))
-            q = p
-            i += 1
-
-        self.create_line(q[0] * self.zoom, q[1] * self.zoom, o[0] * self.zoom, o[1] * self.zoom, fill="lightgreen",
-                         width=2, tags=(s_tag, slice_edge_tag(si, i), "edge", "slice"))
-
+        # Draw label
         center = Polygon(s.bbox).centroid.coords[:]
-        self.create_text(center, fill="lightgreen", text=str(si), font=('Arial', 30),
-                         tags=("label", slice_label_tag(si), "slice"))
-
+        label = self.create_text(center, fill="lightgreen", text=str(si), font=('Arial', 30),
+                                 tags=(s_tag, slice_label_tag(si), "label", "slice"))
+        self.scale(label, 0, 0, self.zoom, self.zoom)
         self.tag_raise("corner")
 
     def update_view(self, x=0, y=0):
