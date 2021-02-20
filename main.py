@@ -34,7 +34,7 @@ menu_operation = tk.Menu(menu, tearoff=0)
 menu_operation.add_command(label="Abort", command=slicer.abort_processing)
 menu_operation.add_command(label="Disable", command=slicer.test_disable)
 menu_operation.add_command(label="Enable", command=slicer.test_enable)
-menu.add_cascade(label="Oper", menu=menu_operation)
+menu.add_cascade(label="Job", menu=menu_operation)
 root.config(menu=menu)
 
 if sys.argv[1:]:

@@ -1,4 +1,4 @@
-from tkinter import *
+import tkinter as tk
 from PIL import Image, ImageTk
 from shapely.geometry import Polygon
 
@@ -71,9 +71,23 @@ class PhotoSlice:
         self.bbox[ci][1] = y
 
 
-class SlicingCanvas(Canvas):
+class SlicingCanvas(tk.Canvas):
+
+    def enable(self, state='normal'):
+
+        def set_status(widget):
+            if widget.winfo_children:
+                for child in widget.winfo_children():
+                    child['state'] = state
+                    set_status(child)
+
+        set_status(self)
+
+    def disable(self):
+        self.enable('disabled')
+
     def __init__(self, parent, **kwargs):
-        Canvas.__init__(self, parent, **kwargs, borderwidth=0, highlightthickness=0, bg="black")
+        tk.Canvas.__init__(self, parent, **kwargs, borderwidth=0, highlightthickness=0, bg="black")
         self.zoom = 1.0
         self.image = None
         self.image_viewport = None
@@ -193,7 +207,7 @@ class SlicingCanvas(Canvas):
         self.update_view(x, y)
 
     def corner_drag_start(self, event):
-        self.corner_dragging_buffer["item"] = self.find_withtag(CURRENT)
+        self.corner_dragging_buffer["item"] = self.find_withtag(tk.CURRENT)
         self.corner_dragging_buffer["x"] = event.x
         self.corner_dragging_buffer["y"] = event.y
 
