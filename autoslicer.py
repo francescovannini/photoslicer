@@ -1,5 +1,5 @@
 import cv2
-from tkinter.tix import *
+import tkinter as tk
 from tools import *
 
 
@@ -11,7 +11,7 @@ class Parameter:
         self.step = step
         self.label = label
         self.control = None
-        self.tk_var = IntVar(value=default)
+        self.tk_var = tk.IntVar(value=default)
 
     def get(self):
         return self.tk_var.get()
