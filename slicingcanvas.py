@@ -1,6 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 from shapely.geometry import Polygon
+import numpy as np
 
 
 def slice_corner_tag(s, c):
@@ -48,8 +49,12 @@ def polys_iou(poly1, poly2):
 
 
 class PhotoSlice:
-    def __init__(self, bbox):
-        self.bbox = bbox
+    def __init__(self, bbox=None):
+        if bbox is None:
+            self.bbox = np.array([[10, 10], [800, 10], [800, 800], [10, 800]]).reshape(4, 2)
+        else:
+            self.bbox = bbox
+
         self.locked = False
 
     def toggle_locked(self, locked=None):
@@ -59,12 +64,13 @@ class PhotoSlice:
             self.locked = not self.locked
 
     def set_top_left_from_edge_index(self, i):
-        bbox = []
-        for n in range(4):
-            j = (i + n) % 4
-            bbox.append(self.bbox[j])
-
-        self.bbox = bbox
+        # bbox = []
+        # for n in range(4):
+        #     j = (i + n) % 4
+        #     bbox.append(self.bbox[j])
+        #
+        # self.bbox = np.array(bbox)
+        self.bbox = np.roll(self.bbox, -i, axis=0)
 
     def update_corner(self, ci, x, y):
         self.bbox[ci][0] = x
@@ -119,8 +125,8 @@ class SlicingCanvas(tk.Canvas):
     def set_on_bbox_updated(self, fn):
         self._on_bbox_updated = fn
 
-    def set_image(self, image):
-        if self.image is None or self.image.width != image.width or self.image.height != image.height:
+    def set_image(self, image, new_image=False):
+        if self.image is None or new_image:
             self.xview_moveto(0)
             self.yview_moveto(0)
             self.zoom = 1.0

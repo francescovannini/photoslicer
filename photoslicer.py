@@ -2,12 +2,15 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
+from tkinter import ttk
 from PIL import Image, ImageTk
+import numpy as np
 from autoslicer import Autoslicer, AutoslicerParams
 from slicingcanvas import SlicingCanvas, PhotoSlice
+import ntpath
 
 
-class MyFrame(tk.Frame):
+class DisableableFrame(tk.Frame):
 
     def enable(self, state='normal'):
 
@@ -25,7 +28,7 @@ class MyFrame(tk.Frame):
         self.enable('disabled')
 
 
-class PhotoSlicer(MyFrame):
+class PhotoSlicer(DisableableFrame):
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
@@ -38,13 +41,25 @@ class PhotoSlicer(MyFrame):
         tk.Grid.columnconfigure(self, 1, weight=1)
 
         # Left side control panel
-        self.frame_controls = MyFrame(self, borderwidth=5)
+        self.frame_controls = DisableableFrame(self, borderwidth=5)
         self.frame_controls.grid(row=0, column=0, sticky="nsw")
 
-        # Set defaults
+        # Open directory
         row = 0
-        self.button_setdef = tk.Button(self.frame_controls, text="Set defaults", command=self.set_default_parameters)
-        self.button_setdef.grid(row=row, column=0, sticky="we")
+        self.button_opendir = tk.Button(self.frame_controls, text="Open directory", command=self.open_directory)
+        self.button_opendir.grid(row=row, column=0, sticky="we")
+
+        # Prev/Next img
+        row += 1
+        self.button_previmg = tk.Button(self.frame_controls, text="Prev Img", command=self.prev_image)
+        self.button_previmg.grid(row=row, column=0, sticky="w")
+        self.button_nextimg = tk.Button(self.frame_controls, text="Next Img", command=self.next_image)
+        self.button_nextimg.grid(row=row, column=0, sticky="e")
+
+        # Save images
+        row += 1
+        self.button_saveimgs = tk.Button(self.frame_controls, text="Save images", command=self.save_all)
+        self.button_saveimgs.grid(row=row, column=0, sticky="we")
 
         # Generate controls from parameters
         row += 1
@@ -56,6 +71,11 @@ class PhotoSlicer(MyFrame):
             p.control = tk.Spinbox(self.frame_controls, from_=p.min, to=p.max, increment=p.step, textvariable=p.tk_var)
             p.control.grid(row=row, column=0, sticky="we")
             row += 1
+
+        # Set defaults
+        row += 1
+        self.button_setdef = tk.Button(self.frame_controls, text="Set defaults", command=self.set_default_parameters)
+        self.button_setdef.grid(row=row, column=0, sticky="we")
 
         row += 1
         self.button_update = tk.Button(self.frame_controls, text="Detect pictures", command=self.update_preview)
@@ -104,20 +124,20 @@ class PhotoSlicer(MyFrame):
         self.disable()
         self.autoslicer.load_image(self.source_images[self.source_index])
         if self.autoslicer.image_loaded():
-            self.update_preview()
+            self.update_preview(new_image=True)
             self.update_statusbar("Loaded " + self.source_images[self.source_index])
         self.enable()
 
-    def update_preview(self):
+    def update_preview(self, new_image=False):
         if not self.autoslicer.image_loaded():
             return
 
         self.disable()
         bbxs, image = self.autoslicer.autodetect_slices(self.update_statusbar)
-        self.slicing_canvas.set_image(Image.fromarray(image))
+        self.slicing_canvas.set_image(Image.fromarray(image), new_image)
         self.slicing_canvas.update_bboxes(bbxs)
         self.slicing_canvas.update_view()
-        self.status_text.set("Ready.")
+        self.update_statusbar("Ready.")
         self.enable()
 
     def save_all(self):
@@ -126,24 +146,29 @@ class PhotoSlicer(MyFrame):
             messagebox.showwarning(title="No image loaded", message="Load an image first")
             return
 
+        basedir = filedialog.askdirectory(title="Select destination directory")
+        if basedir is None or len(basedir) == 0:
+            return
+
         self.disable()
 
-        i = -1
-        for slice in self.slicing_canvas.slices:
+        total_saved = 0
+        for i, slice in enumerate(self.slicing_canvas.slices):
             if not slice.locked:
                 continue
 
-            i += 1
-            outname = self.source_images[self.source_index].replace(".png", "_" + f'{i:03}' + ".png", 1)
+            basename = ntpath.basename(
+                self.source_images[self.source_index].replace(".png", "_" + f'{i:03}' + ".png", 1))
+            outname = basedir + os.path.sep + basename
             self.autoslicer.save_slice(slice.bbox, outname)
             self.update_statusbar("Saved " + outname)
+            total_saved += 1
 
-        if i < 0:
+        if total_saved == 0:
             messagebox.showwarning(title="No locked slice to save!",
                                    message="To lock one slice, click on its central number")
         else:
-            i += 1
-            messagebox.showinfo(title="Slices saved", message=f"{i} slices have been saved")
+            messagebox.showinfo(title="Slices saved", message=f"{total_saved} slices have been saved")
 
         self.enable()
 
@@ -155,7 +180,7 @@ class PhotoSlicer(MyFrame):
         self.autoslicer.abort_operation()
 
     def add_box(self):
-        new_slice = PhotoSlice([[10, 10], [200, 10], [200, 200], [10, 200]])
+        new_slice = PhotoSlice(None)
         new_slice.toggle_locked()
         self.slicing_canvas.add_bbox(new_slice)
 

@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import tkinter as tk
 from tools import *
@@ -22,13 +24,13 @@ class Parameter:
 
 class AutoslicerParams:
     def __init__(self):
-        self.gaussian = Parameter(25, 0, 100, 1, "Gaussian blur (0=disabled)")
+        self.gaussian = Parameter(60, 0, 100, 1, "Gaussian blur (0=disabled)")
         self.bw_method = Parameter(0, 0, 2, 1, "BW Thresh Method (0=Simple, 1=Gauss, 2=Outso)")
-        self.bw_thresh = Parameter(230, 0, 255, 5, "BW Simple/Outso Thresh Min Value")
-        self.bw_gauss = Parameter(51, 0, 1000, 2, "BW Gauss block size")
+        self.bw_thresh = Parameter(200, 0, 255, 5, "BW Simple/Outso Thresh Min Value")
+        self.bw_gauss = Parameter(64, 0, 1000, 2, "BW Gauss block size")
         self.bbox_min_size_prop = Parameter(5, 0, 100, 1, "Detectable min surface (% total)")
-        self.bbox_fill_thresh = Parameter(65, 0, 100, 1, "Bounding box fill ratio threshold")
-        self.dilate_kernel = Parameter(15, 0, 500, 1, "Dilate kernel size (0=disabled)")
+        self.bbox_fill_thresh = Parameter(10, 0, 100, 1, "Bounding box fill ratio threshold")
+        self.dilate_kernel = Parameter(32, 0, 500, 1, "Dilate kernel size (0=disabled)")
         self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
 
@@ -177,20 +179,19 @@ class Autoslicer:
 
     def save_slice(self, hull_quad, out_path):
 
-        src_img = self.image
-
         # Get bounding rotated rectangle containing the simplified hull
         hull_quad_rbb = cv2.minAreaRect(hull_quad)
         hull_quad_rbb_pts = cv2.boxPoints(hull_quad_rbb)
 
         # Minimize distance between hull points and its bbox points
-        hull_quad = shift_points_to_min_distance(hull_quad, hull_quad_rbb_pts)
+        # orientation_offset is used later to straighten the image using the top left corner provided by slice
+        hull_quad_rbb_pts, orientation_offset = shift_points_to_min_distance(hull_quad_rbb_pts, hull_quad)
 
         # For debugging
-        cv2.drawContours(src_img, [np.int0(hull_quad_rbb_pts)], -1, (0, 0, 255), 1)
-        cv2.circle(src_img, tuple(hull_quad_rbb_pts[0]), 10, (0, 0, 255), 2)
-        cv2.drawContours(src_img, [np.int0(hull_quad)], -1, (0, 255, 0), 1)
-        cv2.circle(src_img, tuple(hull_quad[0]), 5, (0, 255, 0), 2)
+        # cv2.drawContours(self.image, [np.int0(hull_quad_rbb_pts)], -1, (0, 0, 255), 1)
+        # cv2.circle(self.image, tuple(hull_quad_rbb_pts[0]), 10, (0, 0, 255), 2)
+        # cv2.drawContours(self.image, [np.int0(hull_quad)], -1, (0, 255, 0), 1)
+        # cv2.circle(self.image, tuple(hull_quad[0]), 20, (0, 255, 0), 2)
 
         # Get the circle enclosing the bounding box enclosing the hull
         hull_quad_rbb_ecirc_c, hull_quad_rbb_ecirc_r = cv2.minEnclosingCircle(hull_quad_rbb_pts)
@@ -201,12 +202,12 @@ class Autoslicer:
              int(hull_quad_rbb_ecirc_c[1] - hull_quad_rbb_ecirc_r))
 
         # For debugging
-        cv2.circle(src_img, hull_quad_rbb_ecirc_c, hull_quad_rbb_ecirc_r, (0, 255, 0), 5)
-        cv2.circle(src_img, hull_quad_rbb_ecirc_c, 10, (0, 255, 0), 2)
-        cv2.circle(src_img, hull_quad_rbb_topleft_pt, 10, (255, 255, 0), 2)
+        # cv2.circle(self.image, hull_quad_rbb_ecirc_c, hull_quad_rbb_ecirc_r, (0, 255, 0), 5)
+        # cv2.circle(self.image, hull_quad_rbb_ecirc_c, 10, (0, 255, 0), 2)
+        # cv2.circle(self.image, hull_quad_rbb_topleft_pt, 10, (255, 255, 0), 2)
 
         # Crop to circle
-        hull_quad_img = crop_to_circle(src_img, hull_quad_rbb_ecirc_c, hull_quad_rbb_ecirc_r)
+        hull_quad_img = crop_to_circle(self.image, hull_quad_rbb_ecirc_c, hull_quad_rbb_ecirc_r)
 
         # Calculate offset array and apply offset to hull, hull bbox and hull bbox enclosing circle center
         offset_a = np.array(hull_quad_rbb_topleft_pt)
@@ -227,8 +228,13 @@ class Autoslicer:
         _, hull_quad_rbb_s, hull_quad_rbb_a = hull_quad_rbb
         hull_quad_rbb_s = tuple(map(int, hull_quad_rbb_s))
 
+        # Use top left corner orientation provided by slice
+        rot = hull_quad_rbb_a - ((orientation_offset + 1) * 90)
+        if orientation_offset == 0 or orientation_offset == 2:  # swap width with height
+            hull_quad_rbb_s = (hull_quad_rbb_s[1], hull_quad_rbb_s[0])
+
         # Get rotation matrix from rectangle
-        hull_quad_rot_matrix = cv2.getRotationMatrix2D(hull_quad_rbb_ecirc_c, hull_quad_rbb_a, 1)
+        hull_quad_rot_matrix = cv2.getRotationMatrix2D(hull_quad_rbb_ecirc_c, rot, 1)
 
         # Perform rotation on src image
         warped_rotated_img = cv2.warpAffine(warped_img, hull_quad_rot_matrix, warped_img.shape[:2],
@@ -236,4 +242,5 @@ class Autoslicer:
 
         # Crop based on size of bbox and center of enclosing circle
         warped_rotated_cropped_img = cv2.getRectSubPix(warped_rotated_img, hull_quad_rbb_s, hull_quad_rbb_ecirc_c)
+
         cv2.imwrite(out_path, warped_rotated_cropped_img)

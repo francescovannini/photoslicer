@@ -34,4 +34,4 @@ def shift_points_to_min_distance(bbox1, bbox2):
             dists[i] += distance_points(shifted[j], p)
 
     best = np.where(dists == np.amin(dists))
-    return np.roll(bbox1, best[0], axis=0)
+    return np.roll(bbox1, best[0], axis=0), best[0][0]
