@@ -157,8 +157,9 @@ class PhotoSlicer(DisableableFrame):
             if not slice.locked:
                 continue
 
-            basename = ntpath.basename(
-                self.source_images[self.source_index].replace(".png", "_" + f'{i:03}' + ".png", 1))
+            basename = ntpath.basename(self.source_images[self.source_index])
+            basename = os.path.splitext(basename)[0] + '_' + f'{i:03}' + '.png'
+
             outname = basedir + os.path.sep + basename
             self.autoslicer.save_slice(slice.bbox, outname)
             self.update_statusbar("Saved " + outname)
@@ -188,10 +189,13 @@ class PhotoSlicer(DisableableFrame):
         if basedir is None:
             basedir = filedialog.askdirectory()
 
+        extensions = ['png', 'jpg', 'jpeg']
         if basedir is not None:
             for file in os.listdir(basedir):
-                if file.endswith(".png"):
-                    self.source_images.append(os.path.join(basedir, file))
+                for e in extensions:
+                    if file.lower().endswith("." + e):
+                        self.source_images.append(os.path.join(basedir, file))
+                        break
 
         if len(self.source_images) == 0:
             messagebox.showwarning(title="No images", message="No images available")
