@@ -24,13 +24,13 @@ class Parameter:
 
 class AutoslicerParams:
     def __init__(self):
-        self.gaussian = Parameter(60, 0, 100, 1, "Gaussian blur (0=disabled)")
+        self.gaussian = Parameter(20, 0, 100, 1, "Gaussian blur (0=disabled)")
         self.bw_method = Parameter(0, 0, 2, 1, "BW Thresh Method (0=Simple, 1=Gauss, 2=Outso)")
-        self.bw_thresh = Parameter(200, 0, 255, 5, "BW Simple/Outso Thresh Min Value")
+        self.bw_thresh = Parameter(210, 0, 255, 5, "BW Simple/Outso Thresh Min Value")
         self.bw_gauss = Parameter(64, 0, 1000, 2, "BW Gauss block size")
-        self.bbox_min_size_prop = Parameter(5, 0, 100, 1, "Detectable min surface (% total)")
+        self.bbox_min_size_prop = Parameter(2, 0, 100, 1, "Detectable min surface (% total)")
         self.bbox_fill_thresh = Parameter(10, 0, 100, 1, "Bounding box fill ratio threshold")
-        self.dilate_kernel = Parameter(32, 0, 500, 1, "Dilate kernel size (0=disabled)")
+        self.dilate_kernel = Parameter(16, 0, 500, 1, "Dilate kernel size (0=disabled)")
         self.preview_filter_output = Parameter(0, 0, 1, 1, "Preview filter output")
 
 
