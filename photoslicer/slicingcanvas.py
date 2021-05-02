@@ -1,5 +1,7 @@
 import tkinter as tk
-from PIL import Image, ImageTk
+import PIL
+from PIL import ImageTk
+from PIL import Image
 from shapely.geometry import Polygon
 import numpy as np
 
@@ -288,7 +290,7 @@ class SlicingCanvas(tk.Canvas):
         # Draw a "cross" at every corner of the bbox
         for i, p in enumerate(s.bbox):
             poly = self.create_polygon(self.cross, outline="blue", activeoutline="red",
-                                       fill="gray", stipple='@transp.xbm', width=3,
+                                       fill="gray", stipple='gray12', width=3,
                                        tags=(s_tag, slice_corner_tag(si, i), "corner", "slice"))
             self.move(poly, p[0], p[1])
             self.scale(poly, 0, 0, self.zoom, self.zoom)

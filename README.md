@@ -1,1 +1,0 @@
-apt install python3-numpy python3-opencv python3-shapely python3-pil.imagetk

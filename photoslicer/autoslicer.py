@@ -1,5 +1,3 @@
-import os
-
 import cv2
 import tkinter as tk
 from tools import *
@@ -113,7 +111,7 @@ class Autoslicer:
 
         # Find contours
         update_status_callback("Finding contours...")
-        _, contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(filter_out, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if hierarchy is not None:
             hierarchy = hierarchy[0]
