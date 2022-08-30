@@ -198,14 +198,14 @@ class SlicingCanvas(tk.Canvas):
         delta = 1.05
 
         # Respond to Linux (event.num) or Windows (event.delta) wheel event
-        if event.num == 5 or event.delta == -120:
+        if event.num == 5 or event.delta == -120 or event.delta == 1:  # scroll down
             if self.zoom < 0.01:
                 return
 
             self.zoom /= delta
             scale /= delta
 
-        if event.num == 4 or event.delta == 120:  # scroll up
+        if event.num == 4 or event.delta == 120 or event.delta == -1:  # scroll up
             if self.zoom > 20:
                 return
             self.zoom *= delta
