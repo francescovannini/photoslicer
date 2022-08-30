@@ -19,7 +19,7 @@ class DisableableFrame(tk.Frame):
             if widget.winfo_children:
                 for child in widget.winfo_children():
                     child_type = child.winfo_class()
-                    if child_type not in ('Frame', 'Labelframe'):
+                    if child_type not in ('Frame', 'Labelframe', 'Menu'):
                         child['state'] = state
                     set_status(child)
 
@@ -37,6 +37,8 @@ class PhotoSlicer(DisableableFrame):
         self.winfo_toplevel().title("PhotoSlicer")
         self.source_images = []
         self.source_index = None
+
+        self.save_format = "jpg"
 
         tk.Grid.rowconfigure(self, 0, weight=1)
         tk.Grid.columnconfigure(self, 1, weight=1)
@@ -56,6 +58,17 @@ class PhotoSlicer(DisableableFrame):
         self.button_previmg.grid(row=row, column=0, sticky="w")
         self.button_nextimg = tk.Button(self.frame_controls, text="Next Img", command=self.next_image)
         self.button_nextimg.grid(row=row, column=0, sticky="e")
+
+        # Save Format
+        row += 1
+        tk.Label(self.frame_controls, text="Save Format").grid(row=row, column=0, sticky="w")
+        
+        row += 1
+        save_formats = ["jpg", "jpeg", "png"]
+        default_format = tk.StringVar()
+        default_format.set(self.save_format)
+        self.save_format_dropdown = tk.OptionMenu(self.frame_controls, default_format, *save_formats, command=self.set_save_format)
+        self.save_format_dropdown.grid(row=row, column=0, sticky="we")
 
         # Save images
         row += 1
@@ -141,6 +154,9 @@ class PhotoSlicer(DisableableFrame):
         self.update_statusbar("Ready.")
         self.enable()
 
+    def set_save_format(self, choice):
+        self.save_format = choice
+
     def save_all(self):
 
         if self.source_images is None or self.source_index < 0:
@@ -159,7 +175,7 @@ class PhotoSlicer(DisableableFrame):
                 continue
 
             basename = ntpath.basename(self.source_images[self.source_index])
-            basename = os.path.splitext(basename)[0] + '_' + f'{i:03}' + '.png'
+            basename = os.path.splitext(basename)[0] + '_' + f'{i:03}' + '.' + self.save_format
 
             outname = basedir + os.path.sep + basename
             self.autoslicer.save_slice(slice.bbox, outname)
